@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0,user-scalable=no" />
+    <title>train list</title>
+    <link rel="stylesheet" href="css/jquery.mobile-1.4.3.css"/>
+</head>
+<body>
+<div data-role="page" id="index">
+    <div data-role="header" data-position="fixed">
+        <h1>TrainTimeQuery</h1>
+    </div>
+    <div role="main" class="ui-content">
+        <div class="ui-field-contain">
+            <label for="search-begin">Start:</label>
+            <input type="text" name="text-basic" id="search-begin" value="">
+        </div>
+        <div class="ui-field-contain">
+            <label for="search-end">Arrival:</label>
+            <input type="text" name="text-basic" id="search-end" value="">
+        </div>
+        <div class="ui-field-contain">
+            <label for="search-num">TrainNum:</label>
+            <input type="text" name="text-basic" id="search-num" value="">
+        </div>
+        <input type="button" value="search" id="search-submit"/>
+        <ul data-role="listview" data-inset="true" id="list">
+        </ul>
+    </div>
+    <div data-role="footer" data-position="fixed">
+        <div data-role="navbar">
+            <ul>
+                <li><a href="#" data-icon="grid" class="ui-btn-active">Query</a></li>
+                <li><a href="#" data-icon="star">Collect</a></li>
+                <li><a href="#" data-icon="gear">Settings</a></li>
+            </ul>
+        </div>
+    </div>
+</div>
+<div data-role="page" id="detail">
+    <div data-role="header" data-position="fixed">
+        <h1>NumberDetail</h1>
+    </div>
+    <div role="main" class="ui-content">
+        <h2></h2>
+        <table data-role="table" id="movie-table" data-mode="reflow" class="ui-responsive">
+            <thead>
+            <tr>
+                <th data-priority="1">StationName</th>
+                <th data-priority="persist">ArriveTime</th>
+                <th data-priority="persist">BeginTime</th>
+            </tr>
+            </thead>
+            <tbody>
+            </tbody>
+        </table>
+        <a href="#" class="ui-btn ui-corner-all" data-rel="back">Return</a>
+    </div>
+    <div data-role="footer" data-position="fixed">
+        <div data-role="navbar">
+            <ul>
+                <li><a href="#" data-icon="grid" class="ui-btn-active">Query</a></li>
+                <li><a href="#" data-icon="star">Collect</a></li>
+                <li><a href="#" data-icon="gear">Settings</a></li>
+            </ul>
+        </div>
+    </div>
+</div>
+
+<script src="http://libs.baidu.com/jquery/1.11.1/jquery.min.js"></script>
+<script src="jquery.mobile.custom.js"></script>
+<script>
+var isBind = 0;
+var urlProxy = "https://crossorigin.me/";
+var urlStationName = "http://www.WebXml.com.cn/WebServices/TrainTimeWebService.asmx/getStationAndTimeByStationName?UserID=";
+var urlTrainCode = "http://www.WebXml.com.cn/WebServices/TrainTimeWebService.asmx/getStationAndTimeByTrainCode?UserID=";
+var urlDetailInfo = "http://www.WebXml.com.cn/WebServices/TrainTimeWebService.asmx/getDetailInfoByTrainCode?UserID=";
+var getTrainList = function(){
+    var searchBegin = $("#search-begin"),
+        searchEnd = $("#search-end"),
+        searchNum = $("#search-num");
+    if(searchNum.val() || (searchBegin.val() && searchEnd.val())){
+        var searchBtn = $(this);
+        searchBtn.button("option","disabled",true);
+        $.mobile.loading("show");
+        var _data = {};
+        var _url = urlStationName;
+        if(!searchNum.val()){
+            _data.StartStation = searchBegin.val();
+            _data.ArriveStation = searchEnd.val();
+        } else {
+            _data.TrainCode = searchNum.val();
+            _url = urlTrainCode;
+        }
+        $.get(urlProxy + _url, _data, function (data) {
+            var list = $("#list");
+            var timeTables = $(data).find("TimeTable");
+            var _arr = [];
+            timeTables.each(function(index,obj) {
+                if(index > 10) return false;
+                var that = $(this);
+                if(that.find("FirstStation").text() == "数据没有被发现"){
+                    alert("数据没有被发现");
+                    return false;
+                }
+                var _html = '<li><a href="#" data-num="' + that.find("TrainCode").text() + '">'
+                        + '<h2>'+ that.find("TrainCode").text() + '</h2>'
+                        + '<p>' + that.find("FirstStation").text() + '-' + that.find("LastStation").text() + '</p>'
+                        + '<p>用时：' + that.find("UseDate").text() + '</p>'
+                        + '<p class="ui-li-aside">'+ that.find("StartTime").text() + '开</p>'
+                        + '</a></li>';
+                _arr.push(_html);
+            });
+            if(_arr.length > 0){
+                list.html(_arr.join(""));
+                list.listview("refresh");
+            }
+            $.mobile.loading("hide");
+            searchBtn.button("option","disabled",false);
+        })
+    } else {
+        alert("请输入车次或发车站和终点站");
+    }
+};
+
+var isAjax = false;
+var getInfoByTrainCode = function(){
+    $.mobile.loading("show");
+    var trainCode = $(this).attr("data-num");
+    var trainDetail = $("#detail");
+    if(isAjax) return;
+    isAjax = true;
+    $.get( urlProxy + urlDetailInfo, {TrainCode:trainCode}, function(data){
+        isAjax = false;
+        trainDetail.find(".ui-content h2").html(trainCode + 'Number');
+        var tbody = trainDetail.find(".ui-content tbody");
+        tbody.html("");
+        $(data).find("TrainDetailInfo").each(function (index,obj) {
+            var tr = $("<tr></tr>");
+            var that = $(this);
+            tr.html('<td>' + that.find("TrainStation").text() + '</td>'
+                    + '<td>' + that.find("ArriveTime").text() +'</td>'
+                    + '<td>' + that.find("StartTime").text() + '</td>');
+            tbody.append(tr);
+        });
+        $.mobile.loading("hide");
+        $.mobile.changePage("#detail");
+    });
+};
+var bindEvent = function(){
+    $("#search-submit").on("click",getTrainList);
+    $("#list").on("click","a",getInfoByTrainCode);
+};
+$(document).on("pageshow","#index",function(){
+    if (isBind) return;
+    isBind = 1;
+    bindEvent();
+});
+</script>
+</body>
+</html>
